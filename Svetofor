@@ -1,0 +1,298 @@
+//Васильев Алексей ПС21
+//7.6.Светофоры(9)
+//Главная улица столицы Берландии имеет длину s.Вдоль нее установлены светофоры, меняющие свет от красного к зеленому и наоборот.Каждый светофор описывается 4 числами xi, ri, gi, di, где
+//xi – расстояние от начала улицы до светофора(1 ≤ xi ≤ s - 1);
+//ri – продолжительность красного света(10 ≤ ri ≤ 20);
+//gi – продолжительность зеленого света(10 ≤ ri ≤ 20);
+//di – минимальный неотрицательный момент времени, когда свет меняется от зеленого к красному(0 ≤ ri < ri + gi).
+//    Каждый светофор с давнего времени работает в своем цикле постоянно.
+//    Король проезжает по всей улице с постоянной скоростью v0(vmin ≤ v ≤ vmax).Чтобы не останавливать его движение, часть светофоров может быть переключена на постоянный зеленый свет.Найти такое значение v0, при котором число переключаемых светофоров минимально.Если таких значений больше одного, выберите из них максимальное.
+//    Ввод.В первой строке находятся числа n, s, vmin и vmax(1 ≤ n < 20000, 1 ≤ s ≤ 20000, 10 ≤  vmin ≤ v ≤ vmax ≤ 50), где n – число светофоров, S – длина улицы в метрах, vmin и vmax – минимальная и максимальная скорости в метрах в секунду.В следующих n строках описываются светофоры.Каждое описание состоит из 4 целых чисел xi, ri, gi, di.Величины ri, gi, di даны в секундах, а xi – в метрах.Никакие два светофора не находятся в одной точке.
+//    Вывод.В первой строке выводится v0 с точностью 10 знаков после десятичной точки.Во второй строке выводится число «вечно зеленых» светофоров для скорости v0.Третья строка в случае присутствия таких светофоров должна содержать их номера в любом порядке.
+//    Примеры
+//    Ввод 1            Ввод 2             Ввод 3
+//    3 1000 10 30      2 1000 10 30       4 1000 10 30
+//    500 10 10 10      500 10 10 10       800 10 15 20
+//    501 10 10 0       600 10 20 2        500 20 10 15
+//    600 10 10 0                          501 20 10 5
+//    600 10 20 15
+//    Вывод 1           Вывод 2            Вывод 3
+//    16.70000000000    25.00000000000     20.04000000000 ---- опечатка по усл до 10 знаков в примере 11
+//    0                 0                  1
+//    2
+//VS2019
+#include <fstream>
+#include <iostream>
+#include <vector>
+#include <algorithm>
+#include <cmath>
+#include <iomanip>
+
+namespace {
+    const long double EPS = 1e-12L;
+    const long double BOUND_EPS = 1e-9L;
+}
+
+struct Light {
+    long double x; // Позиция светофора (метры)
+    long double r; // Длительность красного (секунды)
+    long double g; // Длительность зеленого (секунды)
+    long double d; // Смещение/сдвиг фазы (секунды)
+};
+
+enum class EventType : int {
+    START_CLOSED = 0,  // левая граница закрыта
+    END = 1,            // правая граница
+    START_OPEN = 2      // левая граница открыта
+};
+
+struct Event {
+    long double x;
+    EventType type;
+};
+
+// Проверка, горит ли красный свет в момент времени t (время прибытия в точку расположения источника света).
+bool isLightRedAtTime(const Light& L, long double t, long double eps) {
+    long double T = L.r + L.g;
+    if (T <= 0) return false;
+    long double tt = t - L.d;
+    tt = std::fmod(tt, T);
+    if (tt < 0) tt += T;
+    return (tt > BOUND_EPS) && (tt + BOUND_EPS < L.r);
+}
+
+// Вычисляем список индексов освещенности (с 1-й индексацией), которые необходимо переключать со скоростью v.
+std::vector<int> computeToSwitch(const std::vector<Light>& lights, long double v, long double eps) {
+    std::vector<int> toSwitch;
+    toSwitch.reserve(lights.size());
+    for (std::size_t i = 0; i < lights.size(); ++i) {
+        long double t = lights[i].x / v;
+        if (isLightRedAtTime(lights[i], t, eps)) {
+            toSwitch.push_back(static_cast<int>(i + 1));
+        }
+    }
+    return toSwitch;
+}
+
+bool readInput(std::istream& fin, int& n, long double& s, long double& vmin, long double& vmax,
+               std::vector<Light>& lights) {
+    fin >> n >> s >> vmin >> vmax;
+    if (!fin) return false;
+
+    lights.resize(n);
+    for (int i = 0; i < n; ++i) {
+        int xi, ri, gi, di;
+        fin >> xi >> ri >> gi >> di;
+        lights[i].x = static_cast<long double>(xi);
+        lights[i].r = static_cast<long double>(ri);
+        lights[i].g = static_cast<long double>(gi);
+        lights[i].d = static_cast<long double>(di);
+    }
+    return true;
+}
+
+void writeOutput(std::ostream& fout, long double bestV, const std::vector<int>& toSwitch) {
+    fout << std::fixed << std::setprecision(10) << bestV << '\n';
+    fout << static_cast<int>(toSwitch.size()) << '\n';
+    if (!toSwitch.empty()) {
+        for (std::size_t i = 0; i < toSwitch.size(); ++i) {
+            if (i) fout << ' ';
+            fout << toSwitch[i];
+        }
+        fout << '\n';
+    }
+}
+
+// Особый случай: vmin == vmax, одна фиксированная скорость
+void solveSingleSpeed(long double v, const std::vector<Light>& lights,
+                      std::ostream& fout, long double eps) {
+    std::vector<int> toSwitch = computeToSwitch(lights, v, eps);
+    writeOutput(fout, v, toSwitch);
+}
+
+// Общий случай: линия развертки на интервалах скорости
+void solveGeneral(const std::vector<Light>& lights, long double vmin, long double vmax,
+                  long double& bestV, long long& bestCount, long double eps) {
+    int n = static_cast<int>(lights.size());
+    std::vector<Event> events;
+    events.reserve(n * 8);
+    std::vector<long double> coords;
+    coords.reserve(n * 8);
+    coords.push_back(vmin);
+    coords.push_back(vmax);
+
+    // Генерировать события для каждого интервала зеленого сигнала светофора.
+    for (int i = 0; i < n; ++i) {
+        const auto& L = lights[i];
+        long double x = L.x;
+        long double r = L.r;
+        long double g = L.g;
+        long double d = L.d;
+        long double T = r + g;
+        if (T <= 0) continue;
+
+        long double t_min = x / vmax; // мин время прибытия при vmax
+        long double t_max = x / vmin;
+
+        long double A = d + r;   // начало зеленой зоны во втором сегменте
+        long double B = d + T;   // конец зеленой
+
+        // Сегмент [0, d): зеленый перед первым переключением на красный. (от 0 до 1-го перекл-я на красный)
+        if (d > eps && t_min < d - eps) {
+            long double a = std::max(0.0L, t_min);
+            long double b = std::min(d, t_max);
+            if (b - a > eps) {
+                long double Ls = x / b;
+                long double Rs = x / a;
+                if (!(Rs < vmin - eps || Ls > vmax + eps)) {
+                    long double left = std::max(Ls, vmin);
+                    long double right = std::min(Rs, vmax);
+                    if (right - left > eps) {
+                        bool leftClosed = (Ls < vmin - eps);
+                        events.push_back({left, leftClosed ? EventType::START_CLOSED : EventType::START_OPEN});
+                        events.push_back({right, EventType::END});
+                        coords.push_back(left);
+                        coords.push_back(right);
+                    }
+                }
+            }
+        }
+
+        // Диапазон k: [A+kT, B+kT) перекрывает [t_min, t_max] => k_low <= k <= k_high
+        long long k_low = static_cast<long long>(std::floor((t_min - B) / T)) + 1;
+        long long k_high = static_cast<long long>(std::floor((t_max - A) / T));
+        if (k_low < 0) k_low = 0;
+
+        for (long long k = k_low; k <= k_high; ++k) {
+            long double start = A + static_cast<long double>(k) * T;
+            long double end = B + static_cast<long double>(k) * T;
+
+            long double a = std::max(start, t_min);
+            long double b = std::min(end, t_max);
+            if (b - a <= eps) continue;
+
+            // Сопоставьте временной интервал [a, b) со скоростным интервалом (x/b, x/a]
+            long double Ls = x / b;
+            long double Rs = x / a;
+
+            if (Rs < vmin - eps || Ls > vmax + eps) continue;
+
+            long double left = std::max(Ls, vmin);
+            long double right = std::min(Rs, vmax);
+            if (right - left <= eps) continue;
+
+            bool leftClosed = (Ls < vmin - eps);
+
+            if (leftClosed) {
+                events.push_back({left, EventType::START_CLOSED});
+            } else {
+                events.push_back({left, EventType::START_OPEN});
+            }
+            events.push_back({right, EventType::END});
+
+            coords.push_back(left);
+            coords.push_back(right);
+        }
+    }
+
+    std::sort(coords.begin(), coords.end());
+    coords.erase(std::unique(coords.begin(), coords.end(), [eps](long double a, long double b) {
+        return std::fabsl(a - b) <= eps;
+    }), coords.end());
+
+    bestV = vmin;
+    bestCount = -1;
+
+    if (!events.empty()) {
+        std::sort(events.begin(), events.end(), [eps](const Event& a, const Event& b) {
+            if (std::fabsl(a.x - b.x) > eps) return a.x < b.x;
+            return static_cast<int>(a.type) < static_cast<int>(b.type);
+        });
+
+        long long curCount = 0;
+        std::size_t eIdx = 0;
+        const std::size_t eSz = events.size();
+
+        // Линия развертки: обработка событий в каждой координате
+        for (std::size_t ci = 0; ci < coords.size(); ++ci) {
+            long double x = coords[ci];
+
+            // Обрабатывайте события строго до x
+            while (eIdx < eSz && events[eIdx].x < x - eps) {
+                if (events[eIdx].type == EventType::START_CLOSED || events[eIdx].type == EventType::START_OPEN) {
+                    curCount += 1;
+                } else {
+                    curCount -= 1;
+                }
+                ++eIdx;
+            }
+
+            // Процесс START_CLOSED завершен в точке x
+            std::size_t j = eIdx;
+            while (j < eSz && std::fabsl(events[j].x - x) <= eps && events[j].type == EventType::START_CLOSED) {
+                curCount += 1;
+                ++j;
+            }
+
+            // Проверьте, действителен ли x, и обновите его наилучшим образом.
+            if (x + eps >= vmin && x - eps <= vmax) {
+                if (curCount > bestCount || (curCount == bestCount && x > bestV)) {
+                    bestCount = curCount;
+                    bestV = x;
+                }
+            }
+
+            // Процесс завершен в точке x
+            while (j < eSz && std::fabsl(events[j].x - x) <= eps && events[j].type == EventType::END) {
+                curCount -= 1;
+                ++j;
+            }
+
+            // Обработка START_OPEN в x
+            while (j < eSz && std::fabsl(events[j].x - x) <= eps && events[j].type == EventType::START_OPEN) {
+                curCount += 1;
+                ++j;
+            }
+
+            eIdx = j;
+        }
+    } else {
+        // Нет допустимых интервалов: все скорости пройдены без переключения.
+        bestV = vmax;
+        bestCount = 0;
+    }
+}
+
+int main() {
+    std::ifstream fin("input.txt");
+    if (!fin.is_open()) {
+        return 0;
+    }
+
+    int n;
+    long double s;
+    long double vmin, vmax;
+    std::vector<Light> lights;
+
+    if (!readInput(fin, n, s, vmin, vmax, lights)) {
+        return 0;
+    }
+    fin.close();
+
+    std::ofstream fout("output.txt");
+
+    // Особый случай: одна фиксированная скорость
+    if (std::fabsl(vmax - vmin) <= EPS) {
+        solveSingleSpeed(vmin, lights, fout, EPS);
+        return 0;
+    }
+
+    long double bestV;
+    long long bestCount;
+    solveGeneral(lights, vmin, vmax, bestV, bestCount, EPS);
+
+    std::vector<int> toSwitch = computeToSwitch(lights, bestV, EPS);
+    writeOutput(fout, bestV, toSwitch);
+
+    return 0;
+}

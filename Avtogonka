@@ -1,0 +1,82 @@
+//Васильев Алексей ПС21
+//10.9.Автогонка 1 (9)
+//Автогонщик на кольцевой трассе отрабатывает навыки остановки и дозаправки бензином.Движение происходит только в одном направлении.
+//На круге имеются N платформ для дозаправки, пронумерованных от 1 до N.Для того, чтобы проехать расстояние от i - й до i + 1 - й платформы,
+//требуется Di литров бензина, а от N - й до первой – DN литров.
+//Болид с некоторым объемом бензина доставляется к одной из платформ.
+//После преодоления отрезка от i - й до i + 1 - й платформы в бак доливается Di + 1 литров бензина,
+//а в случае промежутка от N - й до первой – DN + 1 литров.Требуется выбрать стартовую платформу и найти минимальный объем бензина,
+//необходимый для преодоления полного круга.
+//Ввод.В первой строке задано число N(3 ≤ N ≤ 3×10^7).Во  второй  строке  находятся  через пробел значения D1, D2, …, DN(1 ≤ Di ≤ 109).
+//Все числа целые.
+//Вывод.Вывести минимальный объем бензина, необходимый для преодоления полного круга.
+//Пример
+//Ввод
+//5
+//3 7 4 2 5
+//Вывод
+//4
+//Пояснение.Стартовой платформой может быть как платформа 3, так и платформа 4.
+//VS2022
+
+
+#include <cstdio>
+#include <vector>
+#include <deque>
+
+int main() {
+    FILE* fin = fopen("input.txt", "r");
+    FILE* fout = fopen("output.txt", "w");
+
+    int N;
+    if (fscanf(fin, "%d", &N) != 1) {
+        fclose(fin);
+        fclose(fout);
+        return 1;
+    }
+
+    std::vector<long long> D(N);
+    for (int i = 0; i < N; i++)
+        fscanf(fin, "%lld", &D[i]);
+    fclose(fin);
+
+    // B[i] = D[i] - i 
+    std::vector<long long> B(N);
+    for (int i = 0; i < N; i++)
+        B[i] = D[i] - i;
+
+    std::deque<std::pair<long long, int>> dq;
+
+    for (int i = 0; i < N; i++) {
+        while (!dq.empty() && dq.back().first <= B[i])
+            dq.pop_back();
+        dq.push_back({ B[i], i });
+    }
+
+    long long offset = 0;
+    long long ans = dq.front().first + offset;
+
+    for (int k = 1; k < N; k++) {
+        if (!dq.empty() && dq.front().second == k - 1)
+            dq.pop_front();
+
+        offset++;
+
+        long long newVal = D[k - 1] - (N - 1) - offset;
+
+        while (!dq.empty() && dq.back().first <= newVal)
+            dq.pop_back();
+        dq.push_back({ newVal, k - 1 });
+
+        long long cur = dq.front().first + offset;
+        if (cur < ans)
+            ans = cur;
+    }
+
+    if (ans < 0)
+        ans = 0;
+
+    fprintf(fout, "%lld\n", ans);
+    fclose(fout);
+    return 0;
+}

@@ -1,0 +1,143 @@
+//Васильев Алексей ПС21
+//14.10.Распил бруса 2 (10)
+//На пилораму привезли брус длиной L метров.Требуется сделать N распилов.Распилы делят брус на части, длина которых выражается натуральными числами.Стоимость одного распила равна длине распиливаемого бруса.Определить минимальную стоимость распила.
+//Ввод.В первой строке содержатся через пробел натуральные числа L(2 ≤ L ≤ 109) и N(N < L) – длина бруса и число распилов.
+//	Вывод.В единственной строке вывести минимальную стоимость распилов.
+//	Примеры
+//	Ввод 1         Ввод 2
+//	100 3          10 4
+//	Вывод 1        Вывод 2
+//	105            18
+//VS 2019
+//https://www.youtube.com/watch?v=9b2mCgSCjhw&pp=ygUh0LDQu9Cz0L7RgNC40YLQvCDRhdCw0YTRhNC80LDQvdCw0gcJCZEKAYcqIYzv  
+
+#include <cstdint>
+#include <fstream>
+#include <iostream>
+#include <map>
+#include <string>
+
+namespace
+{
+    const std::uint64_t MIN_L = 2;
+    const std::uint64_t MAX_L = 1'000'000'000;
+
+    bool IsValidInput(std::uint64_t L, std::uint64_t N)
+    {
+        return L >= MIN_L && L <= MAX_L && N < L;
+    }
+
+    void PrintUsage()
+    {
+        std::cerr << "Usage: read L and N from input.txt, write result to output.txt.\n"
+            << "  L = beam length, N = number of cuts.\n"
+            << "  Constraints: " << MIN_L << " <= L <= " << MAX_L
+            << ", N < L, natural numbers.\n"
+            << "  Example: input.txt contains \"100 3\" -> output.txt contains \"105\"\n";
+    }
+
+    // P(n): минимальная суммарная стоимость слияния n кусков длины 1 в один (Хаффман при равных весах).
+    // Формула P(n)=n*k+2*m, где 2^k — наибольшая степень двойки ≤ n, m=n-2^k.
+    long long HuffmanMergeOnes(std::uint64_t n)
+    {
+        if (n <= 1) return 0;
+        unsigned int k = 0;
+        while ((static_cast<std::uint64_t>(1) << (k + 1)) <= n) ++k;
+        const std::uint64_t m = n - (static_cast<std::uint64_t>(1) << k);
+        return static_cast<long long>(n) * static_cast<long long>(k) + 2 * static_cast<long long>(m);
+    }
+
+    // Хаффман для мультимножества: n кусков длины 1 и один кусок tail (tail ≥ 2 при L > N+1).
+    // Батчинг по map: O(число различных «волн»), на практике мало итераций даже при n ≈ 10^9.
+    long long HuffmanMergeOnesAndTail(std::uint64_t numOnes, std::uint64_t tail)
+    {
+        std::map<std::uint64_t, std::uint64_t> cnt;
+        cnt[1] = numOnes;
+        cnt[tail] += 1;
+        std::uint64_t total = numOnes + 1;
+        long long cost = 0;
+        while (total > 1)
+        {
+            auto it = cnt.begin();
+            const std::uint64_t v1 = it->first;
+            const std::uint64_t c1 = it->second;
+            if (c1 >= 2)
+            {
+                const std::uint64_t pairs = c1 / 2;
+                const std::uint64_t s = v1 + v1;
+                cost += static_cast<long long>(pairs) * static_cast<long long>(s);
+                cnt[v1] -= 2 * pairs;
+                if (cnt[v1] == 0) cnt.erase(v1);
+                cnt[s] += pairs;
+                total -= pairs;
+            }
+            else
+            {
+                auto it2 = std::next(it);
+                const std::uint64_t v2 = it2->first;
+                const std::uint64_t s = v1 + v2;
+                cost += static_cast<long long>(s);
+                cnt[v1] -= 1;
+                if (cnt[v1] == 0) cnt.erase(v1);
+                cnt[v2] -= 1;
+                if (cnt[v2] == 0) cnt.erase(v2);
+                cnt[s] += 1;
+                total -= 1;
+            }
+        }
+        return cost;
+    }
+
+    long long MinCostToSplit(std::uint64_t L, std::uint64_t N)
+    {
+        if (N == 0) return 0;
+        if (L == N + 1) return HuffmanMergeOnes(N + 1);
+        const std::uint64_t W = L - N;
+        // При W ≥ N «длинный» кусок сливается последним: сумма = L + P(N). Иначе — полный Хаффман.
+        if (W >= N) return static_cast<long long>(L) + HuffmanMergeOnes(N);
+        return HuffmanMergeOnesAndTail(N, W);
+    }
+}
+int main(int argc, char* argv[])
+{
+    if (argc > 1)
+    {
+        const std::string arg = argv[1];
+        if (arg == "--help" || arg == "-h")
+        {
+            PrintUsage();
+            return 0;
+        }
+    }
+
+    std::ifstream in("input.txt");
+    if (!in)
+    {
+        std::cerr << "Error: Cannot open input.txt\n";
+        PrintUsage();
+        return 1;
+    }
+
+    std::uint64_t L = 0, N = 0;
+    in >> L >> N;
+    in.close();
+
+    if (!in || !IsValidInput(L, N))
+    {
+        std::cerr << "Error: Invalid input (L, N)\n";
+        PrintUsage();
+        return 1;
+    }
+
+    std::ofstream out("output.txt");
+    if (!out)
+    {
+        std::cerr << "Error: Cannot open output.txt\n";
+        return 1;
+    }
+
+    out << MinCostToSplit(L, N) << "\n";
+    out.close();
+
+    return 0;
+}

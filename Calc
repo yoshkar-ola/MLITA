@@ -1,0 +1,118 @@
+//Васильев Алексей ПС21
+// 2.8. Калькулятор (5)
+//Одна фирма выпускает в продажу странные калькуляторы.Они могут выполнять лишь три операции :
+//ввести число 1;
+//удвоить текущее число;
+//поменять в текущем числе первую и последнюю цифры.
+//Калькулятор умеет работать лишь с целыми числами от 1 до L(1 ≤ L ≤ 105).Незначащие нули в начале числа отбрасываются.Написать программу, которая проверяет, можно ли на данном калькуляторе получить число N(1 ≤ N ≤ 105).Если это возможно, выдать самую короткую последовательность преобразований.
+//Ввод.В единственной строке находятся через пробел значения число L и N.
+//Вывод.В первой строке вывести Yes или No.Если значение N достижимо, во второй строке выдать количество значений в цепочке преобразований от 1 до N, а в третьей строке через пробел сами эти значения.
+//Примеры
+//Ввод 1       Ввод 2
+//100 61       100 3
+//Вывод 1      Вывод 2
+//Yes          No
+//6
+//1 2 4 8 16 61
+//VS2022
+#include <fstream>
+#include <queue>
+#include <vector>
+#include <algorithm>
+
+namespace {
+const int START = 1;
+const int NO_PARENT = 0;
+}
+
+int swap_first_last(int x) { 
+    if (x < 10) return x;
+    int last = x % 10;
+    int pow10 = 1;
+    int t = x;
+    while (t >= 10) {
+        t /= 10;
+        pow10 *= 10;
+    }
+    int first = t;
+    int middle = (x % pow10) / 10;
+    return last * pow10 + middle * 10 + first;
+}
+
+void read_input(std::istream& in, int& L, int& N) {
+    in >> L >> N;
+}
+
+bool bfs_reach(int L, int N, std::vector<int>& parent) { 
+//делает поиск в ширину от 1 и заполняет массив parent: для каждого достигнутого числа v хранится число u
+// из которого мы впервые пришли в v. Так можно восстановить путь от 1 до N.
+    parent.assign(L + 1, NO_PARENT);
+    std::vector<bool> visited(L + 1, false);
+    std::queue<int> q;
+
+    q.push(START);
+    visited[START] = true;
+    parent[START] = NO_PARENT;
+
+    while (!q.empty()) {
+        int x = q.front();
+        q.pop();
+        if (x == N) return true;
+
+        int doubled = 2 * x;
+        if (doubled <= L && !visited[doubled]) {
+            visited[doubled] = true;
+            parent[doubled] = x;
+            q.push(doubled);
+        }
+
+        int swapped = swap_first_last(x);
+        if (swapped >= START && swapped <= L && !visited[swapped]) {
+            visited[swapped] = true;
+            parent[swapped] = x;
+            q.push(swapped);
+        }
+    }
+    return false;
+}
+
+std::vector<int> build_path(int N, const std::vector<int>& parent) { 
+    std::vector<int> path;
+    for (int v = N; v != NO_PARENT; v = parent[v])
+        path.push_back(v);
+    std::reverse(path.begin(), path.end());
+    return path;
+}
+
+void write_output(std::ostream& out, bool reached, const std::vector<int>& path) {
+    if (!reached) {
+        out << "No\n";
+        return;
+    }
+    out << "Yes\n";
+    out << static_cast<int>(path.size()) << "\n";
+    for (size_t i = 0; i < path.size(); ++i) {
+        if (i) out << " ";
+        out << path[i];
+    }
+    out << "\n";
+}
+
+int main() {
+    std::ifstream fin("input.txt");
+    std::ofstream fout("output.txt");
+
+    int L, N;
+    read_input(fin, L, N);
+
+    std::vector<int> parent;
+    bool reached = bfs_reach(L, N, parent);
+
+    std::vector<int> path;
+    if (reached)
+        path = build_path(N, parent);
+
+    write_output(fout, reached, path);
+
+    return 0;
+}

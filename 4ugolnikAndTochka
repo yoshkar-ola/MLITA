@@ -1,0 +1,73 @@
+//Васильев Алексей ПС21
+//11.9.Четырехугольник и точка(6)
+//В декартовой системе координат на плоскости заданы координаты вершин четырехугольника и еще одной точки.Определить, принадлежит ли эта точка четырехугольнику.
+//Ввод из файла INPUT.TXT.В пяти строках находятся пары чисел - координаты точек.Числа в первых четырех строках - это координаты вершин четырехугольника в порядке обхода против часовой стрелки, в четвертой строке - координаты тестируемой точки.
+//Вывод в файл OUTPUT.TXT.Вывести In, если точка находится внутри четырехугольника, или Out - если снаружи.
+//Ограничения: координаты вершин - целые числа, для любой точки выполняются следующие условия : -109 ≤ x, y ≤ 109, время 1 с.
+//Примеры
+//Ввод 1    Ввод 2    Ввод 3
+//0 0       0 0       0 0
+//100 0     100 0     100 0
+//100 100   25 25     25 25
+//0 100     0 100     0 100
+//100 50    50 50     10 10
+//Вывод 1   Вывод 2   Вывод 3
+//In        Out       In
+//VS2019
+//https://studfile.net/preview/16675657/page:4/
+#include <fstream>
+using namespace std;
+
+struct Point {
+    long long x, y;
+};
+
+// Векторное произведение: (p - a) x (b - a)
+long long cross(Point a, Point b, Point p) {
+    return (p.x - a.x) * (b.y - a.y) - (p.y - a.y) * (b.x - a.x);
+}
+
+// Скалярное произведение: (p - a) * (b - a)
+long long dot(Point a, Point b, Point p) {
+    return (p.x - a.x) * (b.x - a.x) + (p.y - a.y) * (b.y - a.y);
+}
+
+bool onSegment(Point a, Point b, Point p) {
+    if (cross(a, b, p) != 0) return false;
+    return dot(a, b, p) >= 0 && dot(b, a, p) >= 0;
+}
+
+bool pointInQuad(Point v[4], Point p) {
+    for (int i = 0; i < 4; i++) {
+        if (v[i].x == p.x && v[i].y == p.y) return true;
+        if (onSegment(v[i], v[(i + 1) % 4], p)) return true;
+    }
+
+    int cnt = 0;
+    for (int i = 0; i < 4; i++) {
+        Point a = v[i], b = v[(i + 1) % 4];
+        bool cond1 = (a.y < p.y && b.y >= p.y);
+        bool cond2 = (a.y >= p.y && b.y < p.y);
+        if (cond1 || cond2) {
+            double xIntersect = a.x + (double)(b.x - a.x) * (p.y - a.y) / (b.y - a.y);
+            if (xIntersect > p.x) cnt++;
+        }
+    }
+    return (cnt % 2) == 1;
+}
+
+int main() {
+    ifstream fin("input.txt");
+    ofstream fout("output.txt");
+
+    Point v[4], p;
+    for (int i = 0; i < 4; i++)
+        fin >> v[i].x >> v[i].y;
+    fin >> p.x >> p.y;
+
+    fout << (pointInQuad(v, p) ? "In" : "Out") << endl;
+
+    fin.close();
+    fout.close();
+    return 0;
+}
